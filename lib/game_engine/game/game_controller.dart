@@ -2,6 +2,7 @@ import '../models/board.dart';
 import '../models/falling_piece.dart';
 import '../models/piece.dart';
 import '../rules/collision.dart';
+import '../rules/explosion.dart';
 import 'game_state.dart';
 
 class GameController {
@@ -48,11 +49,27 @@ class GameController {
   }
 
   void armExplosive() {
-    // Stub — no-op (реализуем в D1)
+    if (_state.phase != GamePhase.falling) return;
+    final fp = _state.fallingPiece;
+    if (fp == null) return;
+    if (fp.mode != PieceMode.normal) return;
+    if (fp.armedUsed) return;
+    _state = _state.copyWith(
+      fallingPiece: fp.copyWith(mode: PieceMode.explosive, armedUsed: true),
+    );
   }
 
   void detonate() {
-    // Stub — no-op (реализуем в D2)
+    if (_state.phase != GamePhase.falling) return;
+    final fp = _state.fallingPiece;
+    if (fp == null) return;
+    if (fp.mode != PieceMode.explosive) return;
+    final removed = ExplosionHandler.explodeFootprint(fp, _state.board);
+    ExplosionHandler.applyLimitedGravity(_state.board, removed);
+    _state = _state.copyWith(
+      phase: GamePhase.spawning,
+      clearFallingPiece: true,
+    );
   }
 
   void tick(double dt) {
@@ -86,7 +103,7 @@ class GameController {
     if (_gravityAccum < gravityInterval) return;
     _gravityAccum -= gravityInterval;
 
-    // Step 4 — Normal mode
+    // Step 4 — Normal mode / Step 5 — Explosive mode
     final fp = _state.fallingPiece!;
     if (fp.mode == PieceMode.normal) {
       if (CollisionDetector.canMoveDown(fp, _state.board)) {
@@ -102,6 +119,18 @@ class GameController {
         }
         _state = _state.copyWith(
           board: board,
+          phase: GamePhase.spawning,
+          clearFallingPiece: true,
+        );
+      }
+    } else if (fp.mode == PieceMode.explosive) {
+      if (CollisionDetector.canMoveDownExplosive(fp, _state.board)) {
+        _state = _state.copyWith(fallingPiece: fp.copyWith(y: fp.y + 1));
+      } else {
+        // Авто-детонация при касании дна
+        final removed = ExplosionHandler.explodeFootprint(fp, _state.board);
+        ExplosionHandler.applyLimitedGravity(_state.board, removed);
+        _state = _state.copyWith(
           phase: GamePhase.spawning,
           clearFallingPiece: true,
         );

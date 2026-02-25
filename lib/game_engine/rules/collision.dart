@@ -45,4 +45,17 @@ class CollisionDetector {
     final rotatedPiece = fp.copyWith(piece: fp.piece.rotateCW());
     return isValidPosition(rotatedPiece, board);
   }
+
+  /// Проверяет может ли Explosive-фигура сдвинуться вниз на y+1.
+  /// Explosive: проверяет ТОЛЬКО нижнюю границу поля (y >= board.height).
+  /// Установленные блоки игнорируются.
+  /// true если ни одна занятая клетка фигуры не находится на y == board.height-1.
+  static bool canMoveDownExplosive(FallingPiece fp, Board board) {
+    for (final cell in fp.boardCells) {
+      if (cell.y >= board.height - 1) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

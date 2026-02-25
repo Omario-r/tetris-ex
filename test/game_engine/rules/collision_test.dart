@@ -158,9 +158,32 @@ void main() {
       test('O-piece rotation always returns true in valid position', () {
         final piece = PieceFactory.create(PieceType.O);
         final fallingPiece = FallingPiece(piece: piece, x: 4, y: 8);
-
         // O-piece doesn't change shape when rotated
         expect(CollisionDetector.canRotateCW(fallingPiece, board), isTrue);
+      });
+    });
+
+    group('canMoveDownExplosive', () {
+      test('фигура в середине пустого поля → true', () {
+        final piece = PieceFactory.create(PieceType.O);
+        final fallingPiece = FallingPiece(piece: piece, x: 4, y: 8, mode: PieceMode.explosive);
+        expect(CollisionDetector.canMoveDownExplosive(fallingPiece, board), isTrue);
+      });
+
+      test('фигура с клеткой на y == board.height-1 → false', () {
+        final piece = PieceFactory.create(PieceType.O);
+        // O-piece занимает строки y и y+1, ставим так чтобы нижняя строка == 19
+        final fallingPiece = FallingPiece(piece: piece, x: 4, y: 18, mode: PieceMode.explosive);
+        expect(CollisionDetector.canMoveDownExplosive(fallingPiece, board), isFalse);
+      });
+
+      test('фигура над занятым блоком → true (Explosive игнорирует блоки)', () {
+        final piece = PieceFactory.create(PieceType.O);
+        final fallingPiece = FallingPiece(piece: piece, x: 4, y: 8, mode: PieceMode.explosive);
+        // Ставим блок прямо под фигурой
+        board.setCell(4, 10, const Cell.occupied());
+        board.setCell(5, 10, const Cell.occupied());
+        expect(CollisionDetector.canMoveDownExplosive(fallingPiece, board), isTrue);
       });
     });
   });
