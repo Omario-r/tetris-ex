@@ -48,4 +48,8 @@ class GameState {
   bool get canDetonate =>
       fallingPiece != null &&
       fallingPiece!.mode == PieceMode.explosive;
+
+  bool get isWin => phase == GamePhase.won;
+
+  bool get isLost => phase == GamePhase.lost;
 }
