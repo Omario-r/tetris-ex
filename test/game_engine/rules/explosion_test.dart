@@ -66,37 +66,39 @@ void main() {
   });
 
   group('applyLimitedGravity', () {
-    test('4) базовый сдвиг: блок над 2 удалёнными сдвигается на 2', () {
+    test('4) gravity removed: blocks do not move after explosion', () {
       final board = Board(10, 20);
       board.setCell(3, 8, const Cell.occupied());
       // removedPerColumn = {3: {9, 10}} — 2 клетки удалены ниже строки 8
       final removedPerColumn = {3: {9, 10}};
       ExplosionHandler.applyLimitedGravity(board, removedPerColumn);
-      expect(board.isOccupied(3, 8), isFalse);
-      expect(board.isOccupied(3, 10), isTrue);
+      // gravity removed: block stays in place
+      expect(board.isOccupied(3, 8), isTrue);
+      expect(board.isOccupied(3, 10), isFalse);
     });
 
-    test('5) старые пустоты не заполняются', () {
+    test('5) gravity removed: voids remain as is', () {
       final board = Board(10, 20);
       // Блок на (3,3), старая пустота на (3,5), удалена строка 15
       board.setCell(3, 3, const Cell.occupied());
       // (3,5) остаётся пустой (старая пустота)
       final removedPerColumn = {3: {15}};
       ExplosionHandler.applyLimitedGravity(board, removedPerColumn);
-      // Блок (3,3) сдвигается на 1 → (3,4)
-      expect(board.isOccupied(3, 3), isFalse);
-      expect(board.isOccupied(3, 4), isTrue);
+      // gravity removed: block stays in place
+      expect(board.isOccupied(3, 3), isTrue);
+      expect(board.isOccupied(3, 4), isFalse);
       // Пустота (3,5) остаётся пустой
       expect(board.isOccupied(3, 5), isFalse);
     });
 
-    test('6) колонки без удалений не трогаются', () {
+    test('6) gravity removed: no blocks move', () {
       final board = Board(10, 20);
       board.setCell(5, 10, const Cell.occupied());
       final removedPerColumn = {3: {15}};
       ExplosionHandler.applyLimitedGravity(board, removedPerColumn);
-      // Блок в колонке 5 не трогается
+      // gravity removed: no blocks move
       expect(board.isOccupied(5, 10), isTrue);
+      expect(board.isOccupied(3, 15), isFalse);
     });
   });
 }

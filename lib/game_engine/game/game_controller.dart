@@ -65,8 +65,7 @@ class GameController {
     final fp = _state.fallingPiece;
     if (fp == null) return;
     if (fp.mode != PieceMode.explosive) return;
-    final removed = ExplosionHandler.explodeFootprint(fp, _state.board);
-    ExplosionHandler.applyLimitedGravity(_state.board, removed);
+    ExplosionHandler.explodeFootprint(fp, _state.board);
     final board = _state.board;
     final level = _state.level;
     if (HaloCalculator.checkWin(board, level.S, level.H)) {
@@ -147,8 +146,7 @@ class GameController {
         _state = _state.copyWith(fallingPiece: fp.copyWith(y: fp.y + 1));
       } else {
         // Авто-детонация при касании дна
-        final removed = ExplosionHandler.explodeFootprint(fp, _state.board);
-        ExplosionHandler.applyLimitedGravity(_state.board, removed);
+        ExplosionHandler.explodeFootprint(fp, _state.board);
         final level = _state.level;
         if (HaloCalculator.checkWin(_state.board, level.S, level.H)) {
           _state = _state.copyWith(

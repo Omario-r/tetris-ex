@@ -47,7 +47,7 @@ class GameScreenWrapper extends StatelessWidget {
 
     final controller = GameController(
       initialState: initialState,
-      gravityInterval: 0.5,
+      gravityInterval: 1,
     );
 
     return GameScreen(controller: controller);
