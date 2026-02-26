@@ -3,6 +3,7 @@ import '../models/falling_piece.dart';
 import '../models/piece.dart';
 import '../rules/collision.dart';
 import '../rules/explosion.dart';
+import '../rules/halo.dart';
 import 'game_state.dart';
 
 class GameController {
@@ -66,10 +67,19 @@ class GameController {
     if (fp.mode != PieceMode.explosive) return;
     final removed = ExplosionHandler.explodeFootprint(fp, _state.board);
     ExplosionHandler.applyLimitedGravity(_state.board, removed);
-    _state = _state.copyWith(
-      phase: GamePhase.spawning,
-      clearFallingPiece: true,
-    );
+    final board = _state.board;
+    final level = _state.level;
+    if (HaloCalculator.checkWin(board, level.S, level.H)) {
+      _state = _state.copyWith(
+        phase: GamePhase.won,
+        clearFallingPiece: true,
+      );
+    } else {
+      _state = _state.copyWith(
+        phase: GamePhase.spawning,
+        clearFallingPiece: true,
+      );
+    }
   }
 
   void tick(double dt) {
@@ -117,11 +127,20 @@ class GameController {
             board.setCell(cell.x, cell.y, const Cell.occupied());
           }
         }
-        _state = _state.copyWith(
-          board: board,
-          phase: GamePhase.spawning,
-          clearFallingPiece: true,
-        );
+        final level = _state.level;
+        if (HaloCalculator.checkWin(board, level.S, level.H)) {
+          _state = _state.copyWith(
+            board: board,
+            phase: GamePhase.won,
+            clearFallingPiece: true,
+          );
+        } else {
+          _state = _state.copyWith(
+            board: board,
+            phase: GamePhase.spawning,
+            clearFallingPiece: true,
+          );
+        }
       }
     } else if (fp.mode == PieceMode.explosive) {
       if (CollisionDetector.canMoveDownExplosive(fp, _state.board)) {
@@ -130,10 +149,18 @@ class GameController {
         // Авто-детонация при касании дна
         final removed = ExplosionHandler.explodeFootprint(fp, _state.board);
         ExplosionHandler.applyLimitedGravity(_state.board, removed);
-        _state = _state.copyWith(
-          phase: GamePhase.spawning,
-          clearFallingPiece: true,
-        );
+        final level = _state.level;
+        if (HaloCalculator.checkWin(_state.board, level.S, level.H)) {
+          _state = _state.copyWith(
+            phase: GamePhase.won,
+            clearFallingPiece: true,
+          );
+        } else {
+          _state = _state.copyWith(
+            phase: GamePhase.spawning,
+            clearFallingPiece: true,
+          );
+        }
       }
     }
   }

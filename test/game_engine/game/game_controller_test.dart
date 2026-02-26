@@ -4,6 +4,8 @@ import 'package:explosive_tetris/game_engine/game/game_controller.dart';
 import 'package:explosive_tetris/game_engine/models/board.dart';
 import 'package:explosive_tetris/game_engine/models/falling_piece.dart';
 import 'package:explosive_tetris/game_engine/models/piece.dart';
+import 'package:explosive_tetris/game_engine/models/level_template.dart';
+import 'package:explosive_tetris/game_engine/models/target_mask.dart';
 import 'package:explosive_tetris/game_engine/rules/randomizer.dart';
 
 GameController _makeController({
@@ -17,6 +19,7 @@ GameController _makeController({
       fallingPiece: null,
       phase: GamePhase.spawning,
       generator: FixedSequenceGenerator(sequence),
+      level: defaultLevel,
     ),
     gravityInterval: gravityInterval,
   );
@@ -87,6 +90,7 @@ void main() {
           fallingPiece: null,
           phase: GamePhase.won,
           generator: FixedSequenceGenerator([PieceType.I]),
+          level: defaultLevel,
         ),
       );
       final stateBefore = c.state;
@@ -102,6 +106,7 @@ void main() {
           fallingPiece: null,
           phase: GamePhase.lost,
           generator: FixedSequenceGenerator([PieceType.I]),
+          level: defaultLevel,
         ),
       );
       c.tick(1.0);
@@ -209,6 +214,7 @@ void main() {
           fallingPiece: null,
           phase: GamePhase.won,
           generator: FixedSequenceGenerator([PieceType.I]),
+          level: defaultLevel,
         ),
       );
       c.moveLeft();
@@ -385,6 +391,105 @@ void main() {
       for (int x = 3; x <= 6; x++) {
         expect(board.isOccupied(x, board.height - 1), isFalse);
       }
+    });
+  });
+
+  group('checkWin — победа после фиксации', () {
+    test('phase == won после фиксации, если все S заняты и H пуст', () {
+      // S = row 19 (bottom), cols 3..6. I-piece locks there when hitting bottom.
+      // I-piece matrix row 1 = XXXX. At y=18, boardCells y=19. canMoveDown → y=19 → row 20 out of bounds → locks.
+      final mask = TargetMask(width: 4, height: 1, mask: 0xF);
+      final level2 = LevelTemplate(
+        boardWidth: 10,
+        boardHeight: 20,
+        targetMask: mask,
+        targetX: 3,
+        targetY: 19,
+      );
+      final board2 = Board(10, 20);
+      final c = GameController(
+        initialState: GameState(
+          board: board2,
+          fallingPiece: null,
+          phase: GamePhase.spawning,
+          generator: FixedSequenceGenerator([PieceType.I]),
+          level: level2,
+        ),
+        gravityInterval: 0.5,
+      );
+      c.tick(0.1); // spawn
+      // Drop to bottom
+      for (int i = 0; i < 40; i++) {
+        if (c.state.phase != GamePhase.falling) break;
+        c.tick(0.5);
+      }
+      expect(c.state.phase, GamePhase.won);
+      // Next tick is no-op
+      c.tick(0.5);
+      expect(c.state.phase, GamePhase.won);
+    });
+  });
+
+  group('checkWin — победа после detonate()', () {
+    test('phase == won после взрыва, если все S заняты и H пуст', () {
+      // S = row 19 (bottom), cols 3..6. Pre-fill S. Explosive I-piece detonates above (no overlap with S).
+      final mask = TargetMask(width: 4, height: 1, mask: 0xF);
+      final level = LevelTemplate(
+        boardWidth: 10,
+        boardHeight: 20,
+        targetMask: mask,
+        targetX: 3,
+        targetY: 19,
+      );
+      final board = Board(10, 20);
+      // Fill S
+      for (final (x, y) in level.S) {
+        board.setCell(x, y, const Cell.occupied());
+      }
+      // H around S should be empty — check no occupied in H
+      final c = GameController(
+        initialState: GameState(
+          board: board,
+          fallingPiece: null,
+          phase: GamePhase.spawning,
+          generator: FixedSequenceGenerator([PieceType.I]),
+          level: level,
+        ),
+        gravityInterval: 0.5,
+      );
+      c.tick(0.1); // spawn
+      c.armExplosive();
+      c.detonate(); // explode at top, S still filled, H empty
+      expect(c.state.phase, GamePhase.won);
+    });
+  });
+
+  group('checkWin — без победы', () {
+    test('после фиксации S не заполнено → phase == spawning', () {
+      final c = _makeController(sequence: [PieceType.I, PieceType.I]);
+      c.tick(0.1); // spawn
+      // Lock by dropping to bottom — defaultLevel S is large, one I won't fill it
+      for (int i = 0; i < 40; i++) {
+        if (c.state.phase != GamePhase.falling) break;
+        c.tick(0.5);
+      }
+      expect(c.state.phase, GamePhase.spawning);
+    });
+  });
+
+  group('dirtyHalo', () {
+    test('все H пусты → dirtyHalo пустой', () {
+      final c = _makeController();
+      expect(c.state.dirtyHalo, isEmpty);
+    });
+
+    test('один блок в H → dirtyHalo содержит эту клетку', () {
+      final board = Board(10, 20);
+      final hCell = defaultLevel.H.first;
+      board.setCell(hCell.$1, hCell.$2, const Cell.occupied());
+      final c = _makeController(board: board);
+      expect(c.state.dirtyHalo, contains(hCell));
+      expect(c.state.dirtyHalo.length, 1);
     });
   });
 }

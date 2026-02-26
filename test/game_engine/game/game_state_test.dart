@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:explosive_tetris/game_engine/game/game_state.dart';
 import 'package:explosive_tetris/game_engine/models/board.dart';
 import 'package:explosive_tetris/game_engine/models/piece.dart';
+import 'package:explosive_tetris/game_engine/models/level_template.dart';
 import 'package:explosive_tetris/game_engine/rules/randomizer.dart';
 
 void main() {
@@ -14,6 +15,7 @@ void main() {
         fallingPiece: null,
         phase: GamePhase.spawning,
         generator: FixedSequenceGenerator([PieceType.I]),
+        level: defaultLevel,
       );
     });
 
@@ -43,6 +45,7 @@ void main() {
         fallingPiece: null,
         phase: GamePhase.spawning,
         generator: FixedSequenceGenerator([PieceType.I]),
+        level: defaultLevel,
       );
     });
 

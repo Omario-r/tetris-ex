@@ -1,3 +1,5 @@
+import '../models/board.dart';
+
 class HaloCalculator {
   /// Вычисляет H — множество клеток поля, прилегающих к S по 8-соседству,
   /// но не входящих в S.
@@ -20,5 +22,20 @@ class HaloCalculator {
       }
     }
     return H;
+  }
+
+  /// Проверяет условие победы:
+  /// - все клетки S на board заняты (isOccupied)
+  /// - все клетки H на board пусты (!isOccupied)
+  /// S и H берутся из level.S и level.H.
+  static bool checkWin(Board board, Set<(int, int)> S, Set<(int, int)> H) {
+    for (final (sx, sy) in S) {
+      if (!board.isOccupied(sx, sy)) return false;
+    }
+    for (final (hx, hy) in H) {
+      if (hx < 0 || hx >= board.width || hy < 0 || hy >= board.height) continue;
+      if (board.isOccupied(hx, hy)) return false;
+    }
+    return true;
   }
 }
