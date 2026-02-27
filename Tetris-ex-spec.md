@@ -23,6 +23,9 @@
 - **"Фиксация"** — переход падающей фигуры в установленные блоки поля.
 - **"Ход"** — цикл от спавна фигуры до её фиксации или взрыва.
 - **no-op** — команда принята, но ничего не происходит; state не меняется.
+- **Фрагмент** — Target mask уровня; после победы встаёт на место в объекте.
+- **Объект** — визуальная фигура из 4 фрагментов (4 уровня).
+- **Большая картина** — мета-слой из 4 объектов; за скоупом текущего прототипа.
 
 ***
 
@@ -142,50 +145,15 @@ XX..        .XX.        XXX.        XXX.
 - Только клетки поля, которые совпадают с **отпечатком** фигуры в момент взрыва (пересечение клеток фигуры с занятыми клетками поля).
 - Пустые клетки под фигурой не затрагиваются.
 - Блоки вне отпечатка не затрагиваются.
-- После взрыва фигура исчезает; запускается колоночная гравитация, затем проверка победы.
+- После взрыва фигура исчезает; запускается проверка победы.
 
 **Edge cases:**
-- Взрыв над полностью пустой зоной → удалений нет, гравитация не применяется.
+- Взрыв над полностью пустой зоной → удалений нет.
 - Авто-взрыв и ручной взрыв в одном тике: флаг `exploded = true` предотвращает двойную обработку.
 - `detonate()` на уже взорванной фигуре → **no-op**.
 
-### 3.4 Ограниченная колоночная гравитация после взрыва
-
-Применяется только в колонках, где были удалённые клетки.
-
-**Определение:**  
-`removedBelow[x][y]` = количество удалённых клеток в колонке `x` с `y2 > y` (ниже по полю, т.е. с бо́льшим `y`).
-
-**Алгоритм (псевдокод):**
-```
-for x in 0..width-1:
-    if column x had no deletions: continue
-
-    // Считаем removedBelow для каждой строки
-    count = 0
-    for y from (height-1) downto 0:
-        removedBelow[y] = count
-        if cell(x,y) was removed: count += 1
-
-    // Сдвигаем вниз
-    for y from (height-1) downto 0:
-        if cell(x,y) occupied and not removed:
-            shift = removedBelow[y]
-            if shift > 0:
-                cell(x, y + shift) = cell(x, y)
-                cell(x, y) = empty
-```
-
-**Свойства:**
-- Заполняются только новые пустоты от взрыва.
-- Старые пустоты (существовавшие до взрыва) **остаются** на месте.
-- Блоки в других колонках не затрагиваются.
-
-**Edge cases:**
-- Нет удалений в колонке → пропуск.
-- Все клетки колонки удалены → колонка полностью пуста.
-- Блок в самом низу колонки с удалениями ниже → невозможно (удаление и блок не могут быть в одной клетке).
-
+### 3.4 Гравитация после взрыва
+Колоночная гравитация отсутствует. После взрыва пустоты остаются на месте. Игрок расчищает их последующими взрывами.
 
 ### 3.5 Порядок шагов tick(dt)
 
@@ -224,7 +192,6 @@ tick(dt):
          //   т.е. ни одна занятая клетка фигуры не может сдвинуться на y+1
        - else:                          // касание дна → авто-детонация
            → explodeFootprint()
-           → applyLimitedGravity()
            → checkWin:
                if win  → phase = won; return
                if !win → phase = spawning
@@ -235,7 +202,6 @@ tick(dt):
 detonate():
   if mode != Explosive → no-op; return
   → explodeFootprint()
-  → applyLimitedGravity()
   → checkWin:
       if win  → phase = won
       if !win → phase = spawning
@@ -305,6 +271,8 @@ class LevelTemplate {
   final int targetX;          // xStart = 2
   final int targetY;          // yStart = 14
   final int? moveLimit;       // null = без лимита
+  final int objectId;         // индекс объекта (0..3)
+  final int fragmentIndex;    // индекс фрагмента в объекте (0..3)
   late final Set<(int,int)> S;
   late final Set<(int,int)> H;
 
@@ -367,7 +335,7 @@ lib/
     rules/
       collision.dart        // canMove(), canRotate()
       rotation.dart         // rotateCW() — transpose + reverse rows
-      explosion.dart        // explodeFootprint(), applyLimitedGravity()
+      explosion.dart        // explodeFootprint()
       halo.dart             // computeHalo8(), checkWin()
       randomizer.dart       // SevenBagGenerator, FixedSequenceGenerator
     game/
@@ -447,11 +415,6 @@ class GameState {
 - Удаляются только клетки под занятыми клетками фигуры.
 - Пустые клетки под фигурой не затрагиваются.
 
-**Гравитация после взрыва:**
-- Блок над 2 удалёнными клетками сдвигается вниз на 2.
-- Старые пустоты не заполняются.
-- Без удалений → гравитация не применяется.
-
 **Поворот CW:**
 - Поворот при коллизии → no-op, форма не меняется.
 - O-piece: 4 поворота CW → та же форма.
@@ -494,7 +457,61 @@ class GameState {
 - Звуковые эффекты.
 - Несколько уровней с разными Target-масками.
 - TargetMask для окон > 8×8 (смена типа хранения).
+- Опциональная колоночная гравитация (отключена в MVP).
+- Большая картина (мета-слой поверх объектов, следующая итерация).
+- Несколько фрагментов на одном поле одновременно.
+- Произвольная стыковка фрагментов (anchorX/anchorY вместо сетки).
 
 ***
+
+## 9. Мета-прогрессия (расширенный прототип)
+
+### 9.1 Структура
+
+Объект × 4, └── Фрагмент × 4, └── Уровень.
+Расширенный прототип: объект 1 полный (Домик), объекты 2–4 — заглушки (прямоугольник 5×5). Итого 16 уровней, линейная прогрессия.
+
+### 9.2 Новые сущности (Dart)
+
+```dart
+class FragmentDef { final int anchorX; final int anchorY; final LevelTemplate level; }
+
+class ObjectTemplate { final int id; final String name; final List<FragmentDef> fragments; }
+
+class LevelMap { static const List<ObjectTemplate> objects = [...]; static LevelTemplate levelAt(int levelIndex) { final obj = objects[levelIndex ~/ 4]; return obj.fragments[levelIndex % 4].level; } }
+```
+
+### 9.3 Объект 1 — Домик (10×10)
+
+Все фрагменты: Target window 5×5, boardWidth=10, boardHeight=20, yStart=15.
+
+Фрагмент 0 — Крыша левая: xStart=0, anchorX=0, anchorY=0. Клетка (localX,localY) входит в S если localX >= (4 - localY). ASCII: ....X / ...XX / ..XXX / .XXXX / XXXXX. TargetMask width=5 height=5, mask=0x119DFF.
+
+Фрагмент 1 — Крыша правая: xStart=5, anchorX=5, anchorY=0. Клетка входит в S если localX <= localY. ASCII: X.... / XX... / XXX.. / XXXX. / XXXXX. TargetMask width=5 height=5, mask=0x10C73DF.
+
+Фрагмент 2 — Стена левая: xStart=0, anchorX=0, anchorY=5. Все 25 клеток заполнены. TargetMask width=5 height=5 mask=0x1FFFFFF.
+
+Фрагмент 3 — Стена правая: xStart=5, anchorX=5, anchorY=5. Все 25 клеток заполнены. TargetMask width=5 height=5 mask=0x1FFFFFF.
+
+### 9.4 Объекты 2–4 (заглушки)
+
+Каждый: 4 уровня, Target window 5×5, mask=0x1FFFFFF, xStart=2, yStart=15, boardWidth=10, boardHeight=20. objectId=1,2,3 соответственно, fragmentIndex=0..3.
+
+### 9.5 Хранение прогресса
+
+shared_preferences, ключ 'current_level': int (0..15). При провале — повтор. При победе — значение += 1.
+
+### 9.6 Экраны
+
+LevelCompleteScreen: Canvas, сетка фрагментов объекта, текущий фрагмент анимированно встаёт на место, кнопка "Далее".
+ObjectCompleteScreen: Canvas, объект целиком, кнопка "Далее".
+
+### 9.7 Тикеты
+
+H1 — ObjectTemplate, FragmentDef, LevelMap, 16 уровней — зависит от E2
+H2 — ProgressService (shared_preferences) — зависит от H1
+H3 — LevelCompleteScreen (Canvas + анимация фрагмента) — зависит от H2
+H4 — ObjectCompleteScreen (Canvas объект целиком) — зависит от H3
+H5 — Навигация: GameScreen → LevelComplete → ObjectComplete → GameScreen — зависит от H4
 
 Спецификация закрывает все 13 замечаний.  Следующий шаг — backlog задач и готовые промпты для Junie, начиная с первых 3 тикетов? [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/collection_00a62dc2-9771-4bb3-a246-755869e88bac/a3940dd6-8605-4a7c-bf13-09fe539c7485/Tetris-ex-doc.md)
