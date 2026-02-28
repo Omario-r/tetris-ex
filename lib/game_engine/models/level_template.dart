@@ -8,6 +8,8 @@ class LevelTemplate {
   final int targetX;
   final int targetY;
   final int? moveLimit;
+  final int objectId;       // индекс объекта (0..3), дефолт 0
+  final int fragmentIndex;  // индекс фрагмента (0..3), дефолт 0
 
   late final Set<(int, int)> S;
   late final Set<(int, int)> H;
@@ -19,6 +21,8 @@ class LevelTemplate {
     required this.targetX,
     required this.targetY,
     this.moveLimit,
+    this.objectId = 0,
+    this.fragmentIndex = 0,
   }) {
     S = {
       for (final cell in targetMask.cells)
