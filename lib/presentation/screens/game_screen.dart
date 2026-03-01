@@ -93,41 +93,48 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     await ProgressService().advanceOnWin();
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacement(
+    // Capture navigator BEFORE pushReplacement while context is still valid
+    final navigator = Navigator.of(context);
+
+    navigator.pushReplacement(
       MaterialPageRoute(
         builder: (_) => LevelCompleteScreen(
           completedLevelIndex: completedLevel,
-          onNext: () => _afterLevelComplete(completedLevel),
+          onNext: () => _afterLevelComplete(navigator, completedLevel),
         ),
       ),
     );
   }
 
-  void _afterLevelComplete(int completedLevel) {
+  void _afterLevelComplete(NavigatorState navigator, int completedLevel) {
     final isLastFragmentOfObject = (completedLevel + 1) % 4 == 0;
     final nextLevel = completedLevel + 1;
 
     if (isLastFragmentOfObject && nextLevel <= 15) {
       // Show ObjectCompleteScreen
-      Navigator.of(context).pushReplacement(
+      navigator.pushReplacement(
         MaterialPageRoute(
           builder: (_) => ObjectCompleteScreen(
             completedObjectId: completedLevel ~/ 4,
-            onNext: () => _goToNextLevel(nextLevel),
+            onNext: () => navigator.pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => GameScreen(
+                  levelIndex: nextLevel <= 15 ? nextLevel : 0,
+                ),
+              ),
+            ),
           ),
         ),
       );
     } else {
-      _goToNextLevel(nextLevel <= 15 ? nextLevel : 0);
+      navigator.pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => GameScreen(
+            levelIndex: nextLevel <= 15 ? nextLevel : 0,
+          ),
+        ),
+      );
     }
-  }
-
-  void _goToNextLevel(int nextLevel) {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => GameScreen(levelIndex: nextLevel),
-      ),
-    );
   }
 
   @override
