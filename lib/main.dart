@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 
-import 'game_engine/game/game_controller.dart';
-import 'game_engine/game/game_state.dart';
-import 'game_engine/models/board.dart';
-import 'game_engine/models/level_template.dart';
-import 'game_engine/rules/randomizer.dart';
+import 'application/progress_service.dart';
 import 'presentation/screens/game_screen.dart';
 
 void main() {
-  runApp(const ExplosiveTetrisApp());
+  runApp(const AppRoot());
 }
 
-class ExplosiveTetrisApp extends StatelessWidget {
-  const ExplosiveTetrisApp({super.key});
+class AppRoot extends StatelessWidget {
+  const AppRoot({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -26,30 +22,17 @@ class ExplosiveTetrisApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const GameScreenWrapper(),
+      home: FutureBuilder<int>(
+        future: ProgressService().getCurrentLevel(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return GameScreen(levelIndex: snapshot.data!);
+        },
+      ),
     );
-  }
-}
-
-class GameScreenWrapper extends StatelessWidget {
-  const GameScreenWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // Initialize game state
-    final initialState = GameState(
-      board: Board(defaultLevel.boardWidth, defaultLevel.boardHeight),
-      fallingPiece: null,
-      phase: GamePhase.spawning,
-      generator: SevenBagGenerator(),
-      level: defaultLevel,
-    );
-
-    final controller = GameController(
-      initialState: initialState,
-      gravityInterval: 1,
-    );
-
-    return GameScreen(controller: controller);
   }
 }

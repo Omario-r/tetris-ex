@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 
 import '../../game_engine/game/game_controller.dart';
+import '../../game_engine/game/game_state.dart';
+import '../../game_engine/models/board.dart';
+import '../../game_engine/rules/randomizer.dart';
+import '../../game_engine/data/level_map.dart';
+import '../../application/progress_service.dart';
 import '../widgets/board_painter.dart';
+import 'level_complete_screen.dart';
+import 'object_complete_screen.dart';
 
 /// The main game screen widget that displays the Tetris game.
 ///
 /// Uses [TickerProviderStateMixin] to drive the game loop via an
 /// [AnimationController] at approximately 60fps.
 class GameScreen extends StatefulWidget {
-  /// The game controller that manages game state and logic.
-  final GameController controller;
+  /// The level index to load (0..15). Defaults to 0.
+  final int levelIndex;
 
-  /// Creates a [GameScreen] with the given [controller].
-  const GameScreen({super.key, required this.controller});
+  /// Creates a [GameScreen] with the given [levelIndex].
+  const GameScreen({super.key, this.levelIndex = 0});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -20,13 +27,34 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late final AnimationController _animController;
+  late final GameController _controller;
   late double _lastTime;
   static const double _cellSize = 28.0;
+  bool _winHandled = false;
 
   @override
   void initState() {
     super.initState();
     _lastTime = 0.0;
+    _winHandled = false;
+
+    // Load level from LevelMap
+    final level = LevelMap.levelAt(widget.levelIndex);
+
+    // Initialize game state
+    final initialState = GameState(
+      board: Board(level.boardWidth, level.boardHeight),
+      fallingPiece: null,
+      phase: GamePhase.spawning,
+      generator: SevenBagGenerator(),
+      level: level,
+    );
+
+    _controller = GameController(
+      initialState: initialState,
+      gravityInterval: 1,
+    );
+
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 16),
@@ -47,14 +75,64 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _lastTime = now;
 
     if (dt > 0) {
-      widget.controller.tick(dt);
+      _controller.tick(dt);
     }
+
+    // Check for win condition
+    final state = _controller.state;
+    if (state.isWin && !_winHandled) {
+      _winHandled = true;
+      _onWin();
+    }
+
     setState(() {});
+  }
+
+  Future<void> _onWin() async {
+    final completedLevel = widget.levelIndex;
+    await ProgressService().advanceOnWin();
+    if (!mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => LevelCompleteScreen(
+          completedLevelIndex: completedLevel,
+          onNext: () => _afterLevelComplete(completedLevel),
+        ),
+      ),
+    );
+  }
+
+  void _afterLevelComplete(int completedLevel) {
+    final isLastFragmentOfObject = (completedLevel + 1) % 4 == 0;
+    final nextLevel = completedLevel + 1;
+
+    if (isLastFragmentOfObject && nextLevel <= 15) {
+      // Show ObjectCompleteScreen
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ObjectCompleteScreen(
+            completedObjectId: completedLevel ~/ 4,
+            onNext: () => _goToNextLevel(nextLevel),
+          ),
+        ),
+      );
+    } else {
+      _goToNextLevel(nextLevel <= 15 ? nextLevel : 0);
+    }
+  }
+
+  void _goToNextLevel(int nextLevel) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => GameScreen(levelIndex: nextLevel),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = widget.controller.state;
+    final state = _controller.state;
     final boardWidth = state.level.boardWidth;
     final boardHeight = state.level.boardHeight;
     final boardPixelWidth = boardWidth * _cellSize;
@@ -65,11 +143,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       body: Column(
         children: [
           // HUD
-          const Padding(
-            padding: EdgeInsets.all(8.0),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
             child: Text(
-              'ETT',
-              style: TextStyle(
+              'Level ${widget.levelIndex + 1}',
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -112,56 +190,58 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
           ),
           // Control panel
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Movement buttons
-                IconButton(
-                  icon: const Icon(Icons.arrow_left, color: Colors.white),
-                  onPressed: () => widget.controller.moveLeft(),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.arrow_downward, color: Colors.white),
-                  onPressed: () => widget.controller.softDrop(),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white),
-                  onPressed: () => widget.controller.rotateCW(),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.arrow_right, color: Colors.white),
-                  onPressed: () => widget.controller.moveRight(),
-                ),
-                const SizedBox(width: 24),
-                // ARM button
-                Opacity(
-                  opacity: state.canArm ? 1.0 : 0.3,
-                  child: IconButton(
-                    icon: Text(
-                      'ARM',
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Movement buttons
+                  IconButton(
+                    icon: const Icon(Icons.arrow_left, color: Colors.white),
+                    onPressed: () => _controller.moveLeft(),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_downward, color: Colors.white),
+                    onPressed: () => _controller.softDrop(),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    onPressed: () => _controller.rotateCW(),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_right, color: Colors.white),
+                    onPressed: () => _controller.moveRight(),
+                  ),
+                  const SizedBox(width: 24),
+                  // ARM button
+                  Opacity(
+                    opacity: state.canArm ? 1.0 : 0.3,
+                    child: IconButton(
+                      icon: Text(
+                        'ARM',
+                        style: TextStyle(
+                          color: Colors.orange,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
+                      onPressed: state.canArm ? () => _controller.armExplosive() : null,
                     ),
-                    onPressed: state.canArm ? () => widget.controller.armExplosive() : null,
                   ),
-                ),
-                // DETONATE button
-                Opacity(
-                  opacity: state.canDetonate ? 1.0 : 0.3,
-                  child: IconButton(
-                    icon: const Text(
-                      '💥',
-                      style: TextStyle(fontSize: 24),
+                  // DETONATE button
+                  Opacity(
+                    opacity: state.canDetonate ? 1.0 : 0.3,
+                    child: IconButton(
+                      icon: const Text(
+                        '💥',
+                        style: TextStyle(fontSize: 24),
+                      ),
+                      onPressed: state.canDetonate ? () => _controller.detonate() : null,
                     ),
-                    onPressed: state.canDetonate ? () => widget.controller.detonate() : null,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
