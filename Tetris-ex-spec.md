@@ -390,6 +390,25 @@ class GameState {
 }
 ```
 
+### 6.4 Правило навигации с колбэками
+NavigatorState захватывается через `Navigator.of(context)` один раз, пока виджет ещё mounted, до любого `pushReplacement`/`push`. Полученный `NavigatorState` передаётся в колбэки явным параметром.
+
+**Запрещено** использовать `context` из `State` внутри колбэков, которые вызываются после `pushReplacement` — `State` к этому моменту уже размонтирован и его `context` недействителен.
+
+**Правильный паттерн:**
+```dart
+final navigator = Navigator.of(context);
+navigator.pushReplacement(
+  MaterialPageRoute(
+    builder: (_) => NextScreen(
+      onNext: () => navigator.pushReplacement(...),
+    ),
+  ),
+);
+```
+
+**Причина:** это правило выявлено при реализации тикета H5. Нарушение приводит к ошибке: `"This widget has been unmounted, so the State no longer has a context"`
+
 ***
 
 ## 7. Тестирование
