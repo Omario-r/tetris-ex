@@ -148,3 +148,42 @@ For more details, see README.md and docs/QUICKSTART.md.
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
+
+## Project: Explosive Template Tetris
+
+### Key Documents
+- **`VISION.md`** — why this game exists, target audience, unique mechanics rationale
+- **`ARCHITECTURE.md`** — stack decisions, module boundaries, key constraints
+- **`Tetris-ex-doc.md`** — game design, mechanics, core loop, meta-progression
+- **`Tetris-ex-spec.md`** — technical spec: API, algorithms, edge cases, data structures
+
+Read in order: VISION → ARCHITECTURE → doc → spec.
+Always read the relevant section of `Tetris-ex-spec.md` before implementing any task.
+Use `--spec-id` field in the issue to find the exact section.
+
+
+### Architecture Rules
+
+**CRITICAL: `game_engine/` must never import `flutter/*`**
+- `lib/game_engine/` — pure Dart only, zero Flutter dependencies
+- `lib/presentation/` — Flutter UI, depends on game_engine
+- `lib/application/` — game loop (Ticker), depends on game_engine
+- Dependencies flow ONE WAY: `presentation → application → game_engine`
+
+### Tech Stack
+- Flutter (no Flame)
+- Rendering: `CustomPainter` / `CustomPaint`
+- Game loop: `Ticker` / `AnimationController`
+- Tests: Flutter test framework, pure Dart unit tests for engine
+
+### Code Conventions
+- Engine logic: pure functions where possible, deterministic
+- All public API methods: no-op on invalid input (never throw)
+- Coordinate system: `(0,0)` top-left, y grows down
+- Piece rotation: CW only (CCW is post-MVP backlog)
+
+### Testing Requirements
+- Every engine task must include unit tests
+- Every UI task must include widget tests
+- Run `flutter test` before closing any issue
+- Run `flutter analyze` — zero errors required
