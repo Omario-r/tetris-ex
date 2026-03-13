@@ -1,5 +1,7 @@
 # Explosive Tetris
 
+This project was developed entirely with the help of an LLM and codinig agent.
+
 A unique Tetris variant with explosive mechanics and target-based victory conditions, built with Flutter.
 
 ## Overview
